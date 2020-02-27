@@ -1,8 +1,6 @@
 package org.academiadecodigo.chatserver;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Scanner;
@@ -10,9 +8,10 @@ import java.util.Scanner;
 public class Client {
 
     private Socket serverSocket;
-    private Scanner keyboardIn;
-    private OutputStream clientOut;
-    private InputStream clientIn;
+
+    BufferedReader keyboardIn;
+    BufferedReader clientIn;
+    BufferedWriter clientOut;
 
     public static void main(String[] args) {
 
@@ -25,17 +24,26 @@ public class Client {
 
     }
 
+    private void openStreams() {
+
+        try {
+            keyboardIn = new BufferedReader(new InputStreamReader(System.in));
+            clientIn = new BufferedReader(new InputStreamReader(serverSocket.getInputStream()));
+            clientOut = new BufferedWriter(new OutputStreamWriter(serverSocket.getOutputStream()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
     private void start() {
         String messageFromServer;
-        byte[] readBuffer = new byte[1024];
-        int numberOfCharsRead;
 
         while (true) {
             try {
 
-                numberOfCharsRead = clientIn.read(readBuffer);
-                messageFromServer = new String(readBuffer, 0, numberOfCharsRead);
-                System.out.print("Message Received: " + messageFromServer);
+                messageFromServer = clientIn.readLine();
+                System.out.println("Message Received: " + messageFromServer);
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -45,14 +53,9 @@ public class Client {
 
     //Constructor
     public Client(String hostName, int portNumber) {
-
         try {
-
-            keyboardIn = new Scanner(System.in);
             serverSocket = new Socket(InetAddress.getByName(hostName), portNumber);
-            clientOut = serverSocket.getOutputStream();
-            clientIn = serverSocket.getInputStream();
-
+            openStreams();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -65,19 +68,21 @@ public class Client {
         public void run() {
 
             while (true) {
-                System.out.println("Message to send?: ");
-                clientMessage = keyboardIn.nextLine();
-                sendMessage(clientMessage);
+
+                try {
+                    System.out.println("Message to send?: ");
+                    clientMessage = keyboardIn.readLine();
+
+                    clientOut.write(clientMessage);
+                    clientOut.newLine();
+                    clientOut.flush();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
             }
         }
 
-        private void sendMessage(String messageToSend) {
-            try {
-                clientOut.write(messageToSend.getBytes(), 0, messageToSend.length());
-                clientOut.write("\n".getBytes());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 }

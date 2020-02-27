@@ -1,8 +1,6 @@
 package org.academiadecodigo.chatserver;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Collections;
@@ -61,27 +59,24 @@ public class Server {
     public class ServerWorker implements Runnable {
 
         private Socket serverWorkerSocket;
-        private InputStream serverWorkerIn;
-        private OutputStream serverWorkerOut;
+        private BufferedReader serverWorkerIn;
+        private BufferedWriter serverWorkerOut;
 
         public ServerWorker(Socket serverWorkerSocket) {
             this.serverWorkerSocket = serverWorkerSocket;
-            initStreams();
+            openStreams();
         }
 
         @Override
         public void run() {
 
             String receivedMessage;
-            byte[] recvBuffer = new byte[1024];
-            int numberOfCharsRead;
 
             while (true) {
                 try {
-                    numberOfCharsRead = serverWorkerIn.read(recvBuffer, 0, recvBuffer.length);
-                    receivedMessage = new String(recvBuffer, 0, numberOfCharsRead);
-                    System.out.print("Message received from: " + serverWorkerSocket + " Message: " + receivedMessage);
-                    
+                    receivedMessage = serverWorkerIn.readLine();
+                    //System.out.println("Message received from: " + serverWorkerSocket + " Message: " + receivedMessage);
+                    broadcast("Message from: " + serverWorkerSocket + " Message: " + receivedMessage);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -89,12 +84,10 @@ public class Server {
             }
         }
 
-        private void initStreams() {
+        private void openStreams() {
             try {
-
-                serverWorkerIn = serverWorkerSocket.getInputStream();
-                serverWorkerOut = serverWorkerSocket.getOutputStream();
-
+                serverWorkerIn = new BufferedReader(new InputStreamReader(serverWorkerSocket.getInputStream()));
+                serverWorkerOut = new BufferedWriter(new OutputStreamWriter(serverWorkerSocket.getOutputStream()));
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -102,11 +95,13 @@ public class Server {
 
         public void sendMessage(String messageToSend) {
             try {
-                serverWorkerOut.write(messageToSend.getBytes(),0, messageToSend.length());
-                serverWorkerOut.write("\n".getBytes());
+                serverWorkerOut.write(messageToSend);
+                serverWorkerOut.newLine();
+                serverWorkerOut.flush();
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
         }
 
     }
