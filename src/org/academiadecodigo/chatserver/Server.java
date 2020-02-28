@@ -13,34 +13,38 @@ public class Server {
 
     private int portNumber = 6666;
     private ServerSocket serverSocket;
+    private List<ServerWorker> workersList;
 
-    private List<ServerWorker> serverWorkersList;
-
-    private ExecutorService workerThreads = Executors.newFixedThreadPool(10);
-
-    Socket clientSocket;
+    private ExecutorService workerThreads = Executors.newFixedThreadPool(100);
 
     public static void main(String[] args) {
         Server server = new Server();
         server.start();
     }
 
-    public Server() {
+    private Server() {
         try {
-            serverWorkersList = Collections.synchronizedList(new LinkedList<>());
+
+            workersList = Collections.synchronizedList(new LinkedList<>());
             serverSocket = new ServerSocket(portNumber);
             System.out.println("Server started: " + serverSocket);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void start() {
+    private void start() {
         while (true) {
             try {
 
-                ServerWorker serverWorker = new ServerWorker(serverSocket.accept());
-                serverWorkersList.add(serverWorker);
+                System.out.println("waiting for connections ...");
+                Socket workerSocket = serverSocket.accept();
+
+                System.out.println("New client connected: " + workerSocket);
+
+                ServerWorker serverWorker = new ServerWorker(workerSocket);
+                workersList.add(serverWorker);
                 workerThreads.submit(serverWorker);
 
             } catch (IOException e) {
@@ -49,8 +53,8 @@ public class Server {
         }
     }
 
-    public void broadcast(String messageToBroadcast) {
-        for (ServerWorker worker : serverWorkersList) {
+    private synchronized void broadcast(String messageToBroadcast) {
+        for (ServerWorker worker : workersList) {
             worker.sendMessage(messageToBroadcast);
         }
     }
@@ -58,12 +62,12 @@ public class Server {
 
     public class ServerWorker implements Runnable {
 
-        private Socket serverWorkerSocket;
-        private BufferedReader serverWorkerIn;
-        private BufferedWriter serverWorkerOut;
+        private Socket workerSocket;
+        private BufferedReader workerIn;
+        private BufferedWriter workerOut;
 
-        public ServerWorker(Socket serverWorkerSocket) {
-            this.serverWorkerSocket = serverWorkerSocket;
+        public ServerWorker(Socket workerSocket) {
+            this.workerSocket = workerSocket;
             openStreams();
         }
 
@@ -72,22 +76,40 @@ public class Server {
 
             String receivedMessage;
 
-            while (true) {
+            while (!workerSocket.isClosed()) {
                 try {
-                    receivedMessage = serverWorkerIn.readLine();
-                    //System.out.println("Message received from: " + serverWorkerSocket + " Message: " + receivedMessage);
-                    broadcast("Message from: " + serverWorkerSocket + " Message: " + receivedMessage);
+                    if ((receivedMessage = workerIn.readLine()) != null) {
+
+                        System.out.println("Message from: " + workerSocket + " Message: " + receivedMessage);
+                        broadcast("Message from: " + workerSocket + " Message: " + receivedMessage);
+
+                        if (receivedMessage.equals("/quit")) {
+                            System.out.println("Closing connection from: " + workerSocket);
+                            closeStreams();
+                            workersList.remove(this);
+                        }
+
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
             }
         }
 
         private void openStreams() {
             try {
-                serverWorkerIn = new BufferedReader(new InputStreamReader(serverWorkerSocket.getInputStream()));
-                serverWorkerOut = new BufferedWriter(new OutputStreamWriter(serverWorkerSocket.getOutputStream()));
+                workerIn = new BufferedReader(new InputStreamReader(workerSocket.getInputStream()));
+                workerOut = new BufferedWriter(new OutputStreamWriter(workerSocket.getOutputStream()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void closeStreams() {
+            try {
+                workerOut.close();
+                workerIn.close();
+                workerSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -95,11 +117,12 @@ public class Server {
 
         public void sendMessage(String messageToSend) {
             try {
-                serverWorkerOut.write(messageToSend);
-                serverWorkerOut.newLine();
-                serverWorkerOut.flush();
+                workerOut.write(messageToSend);
+                workerOut.newLine();
+                workerOut.flush();
             } catch (IOException e) {
-                e.printStackTrace();
+                workersList.remove(this);
+                //e.printStackTrace();
             }
 
         }
