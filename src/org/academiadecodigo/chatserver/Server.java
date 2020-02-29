@@ -3,9 +3,7 @@ package org.academiadecodigo.chatserver;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -13,7 +11,9 @@ public class Server {
 
     private int portNumber = 6666;
     private ServerSocket serverSocket;
-    private List<ServerWorker> workersList;
+    private Map<String, ServerWorker> workersList;
+    private final String NICKNAME_TAKEN = "This alias is already taken, choose a different one\n";
+    private final String NICKNAME_VALID = "Nickname valid, welcome to the server\n";
 
     private ExecutorService workerThreads = Executors.newFixedThreadPool(100);
 
@@ -25,7 +25,7 @@ public class Server {
     private Server() {
         try {
 
-            workersList = Collections.synchronizedList(new LinkedList<>());
+            workersList = Collections.synchronizedMap(new Hashtable<>());
             serverSocket = new ServerSocket(portNumber);
             System.out.println("Server started: " + serverSocket);
 
@@ -41,10 +41,36 @@ public class Server {
                 System.out.println("waiting for connections ...");
                 Socket workerSocket = serverSocket.accept();
 
-                System.out.println("New client connected: " + workerSocket);
+                BufferedReader in = new BufferedReader(new InputStreamReader(workerSocket.getInputStream()));
+                BufferedWriter out = new BufferedWriter(new OutputStreamWriter(workerSocket.getOutputStream()));
 
                 ServerWorker serverWorker = new ServerWorker(workerSocket);
-                workersList.add(serverWorker);
+
+                String clientNickName = in.readLine();
+                System.out.println("clt nick " + clientNickName);
+
+                workersList.put(clientNickName, serverWorker);
+
+                while (workersList.keySet().contains(clientNickName)) {
+                    out.write(NICKNAME_TAKEN);
+                    out.newLine();
+                    out.flush();
+                    clientNickName = in.readLine();
+                    System.out.println("nickname + " + clientNickName);
+                    workersList.put(clientNickName, serverWorker);
+                }
+
+                System.out.println("New client connected from: " + serverSocket + " nickname: " + clientNickName);
+
+                out.write(NICKNAME_VALID);
+                out.newLine();
+                out.flush();
+
+                serverWorker.setWorkerIn(in);
+                serverWorker.setWorkerOut(out);
+
+
+                System.out.println(workersList.keySet());
                 workerThreads.submit(serverWorker);
 
             } catch (IOException e) {
@@ -54,21 +80,29 @@ public class Server {
     }
 
     private synchronized void broadcast(String messageToBroadcast) {
-        for (ServerWorker worker : workersList) {
+        for (ServerWorker worker : workersList.values()) {
             worker.sendMessage(messageToBroadcast);
         }
     }
 
-
-    public class ServerWorker implements Runnable {
+    //**********************************************
+    private class ServerWorker implements Runnable {
 
         private Socket workerSocket;
         private BufferedReader workerIn;
         private BufferedWriter workerOut;
 
+        public void setWorkerIn(BufferedReader workerIn) {
+            this.workerIn = workerIn;
+        }
+
+        public void setWorkerOut(BufferedWriter workerOut) {
+            this.workerOut = workerOut;
+        }
+
         public ServerWorker(Socket workerSocket) {
             this.workerSocket = workerSocket;
-            openStreams();
+            //openStreams();
         }
 
         @Override
@@ -78,22 +112,43 @@ public class Server {
 
             while (!workerSocket.isClosed()) {
                 try {
-                    if ((receivedMessage = workerIn.readLine()) != null) {
+                    receivedMessage = workerIn.readLine();
 
-                        System.out.println("Message from: " + workerSocket + " Message: " + receivedMessage);
-                        broadcast("Message from: " + workerSocket + " Message: " + receivedMessage);
-
-                        if (receivedMessage.equals("/quit")) {
-                            System.out.println("Closing connection from: " + workerSocket);
-                            closeStreams();
-                            workersList.remove(this);
-                        }
-
+                    if ((receivedMessage) == null) {
+                        return;
                     }
+
+                    if (receivedMessage.charAt(0) == '/') {
+                        processCommand(receivedMessage);
+                        continue;
+                    }
+
+                    System.out.println("Message from " + workerSocket + " Message: " + receivedMessage);
+                    broadcast("Message from " + workerSocket + " Message: " + receivedMessage);
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
+        }
+
+        private void processCommand(String userCommand) {
+
+            String command = userCommand.split("=")[0];
+            String commandArgument = userCommand.split("=")[1];
+
+            switch (command) {
+                case "/quit":
+                    System.out.println("Closing connection from: " + workerSocket);
+                    closeStreams();
+                    workersList.remove(this);
+                    break;
+                case "/alias":
+                    System.out.println("Change alias command");
+
+            }
+
+
         }
 
         private void openStreams() {

@@ -46,15 +46,18 @@ public class Client {
 
                 String messageFromServer = clientIn.readLine();
 
-                if (messageFromServer != null) {
-                    System.out.println("Message Received: " + messageFromServer);
+                if (messageFromServer == null) {
+                    break;
                 }
+
+                System.out.println("Message Received: " + messageFromServer);
 
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-
+        System.out.println("Server disconnected");
+        closeConnections();
     }
 
     //Constructor
@@ -63,8 +66,21 @@ public class Client {
         try {
             serverSocket = new Socket(InetAddress.getByName(hostName), portNumber);
             openStreams();
+
+            System.out.println("What is your desired alias?:");
+            String clientNickName = keyboardIn.readLine();
+
+            if (clientNickName != null) {
+                clientOut.write(clientNickName);
+                clientOut.newLine();
+                clientOut.flush();
+                System.out.println(clientIn.readLine());
+            }
+
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Server is down. Closing program");
+            System.exit(200);
+            //e.printStackTrace();
         }
 
     }
@@ -73,14 +89,15 @@ public class Client {
         try {
 
             clientIn.close();
-            System.out.println("client In Stream closed");
+            System.out.println("clientIn Stream closed");
 
             clientOut.close();
-            System.out.println("Client Out Stream closed");
+            System.out.println("ClientOut Stream closed");
 
             serverSocket.close();
             System.out.println("Server Socket closed");
 
+            System.out.println("Closing Client");
             System.exit(100);
 
         } catch (IOException e) {
@@ -89,17 +106,6 @@ public class Client {
     }
 
     private class ClientRunnable implements Runnable {
-
-        String clientAlias;
-
-        public ClientRunnable() {
-            try {
-                System.out.println("What is your nickname?: ");
-                clientAlias = keyboardIn.readLine();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
 
         @Override
         public void run() {
@@ -110,13 +116,9 @@ public class Client {
                     System.out.println("Message to send?: ");
                     String clientMessage = keyboardIn.readLine();
 
-                    clientOut.write("["+ clientAlias + "]: " + clientMessage);
+                    clientOut.write(clientMessage);
                     clientOut.newLine();
                     clientOut.flush();
-
-                    if (clientMessage.equals("/quit")) {
-                        closeConnections();
-                    }
 
                 } catch (IOException e) {
                     e.printStackTrace();
