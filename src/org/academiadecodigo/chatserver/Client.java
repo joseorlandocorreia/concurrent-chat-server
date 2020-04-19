@@ -17,8 +17,6 @@ public class Client {
 
         Client client = new Client("127.0.0.1", 6666);
 
-        //Client client = new Client("192.168.250.205", 6666);
-
         Thread clientThread = new Thread(client.new ClientRunnable());
         clientThread.start();
 
@@ -50,13 +48,13 @@ public class Client {
                     break;
                 }
 
-                System.out.println("Message Received: " + messageFromServer);
+                System.out.println(StringUtils.MESSAGE_RECEIVED + messageFromServer);
 
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        System.out.println("Server disconnected");
+        System.out.println(StringUtils.SERVER_DISCONNECTED);
         closeConnections();
     }
 
@@ -67,7 +65,7 @@ public class Client {
             serverSocket = new Socket(InetAddress.getByName(hostName), portNumber);
             openStreams();
 
-            System.out.println("What is your desired alias?:");
+            System.out.println(StringUtils.ASK_ALIAS);
             String clientNickName = keyboardIn.readLine();
 
             if (clientNickName != null) {
@@ -78,9 +76,8 @@ public class Client {
             }
 
         } catch (IOException e) {
-            System.out.println("Server is down. Closing program");
+            System.out.println(StringUtils.SERVER_DOWN);
             System.exit(200);
-            //e.printStackTrace();
         }
 
     }
@@ -89,15 +86,15 @@ public class Client {
         try {
 
             clientIn.close();
-            System.out.println("clientIn Stream closed");
+            System.out.println(StringUtils.IN_STREAM_CLOSING);
 
             clientOut.close();
-            System.out.println("ClientOut Stream closed");
+            System.out.println(StringUtils.OUT_STREAM_CLOSING);
 
             serverSocket.close();
-            System.out.println("Server Socket closed");
+            System.out.println(StringUtils.SERVER_SOCKET_CLOSING);
 
-            System.out.println("Closing Client");
+            System.out.println(StringUtils.PROGRAM_CLOSING);
             System.exit(100);
 
         } catch (IOException e) {
@@ -113,7 +110,7 @@ public class Client {
             while (!serverSocket.isClosed()) {
 
                 try {
-                    System.out.println("Message to send?: ");
+                    System.out.println(StringUtils.ASK_MESSAGE);
                     String clientMessage = keyboardIn.readLine();
 
                     clientOut.write(clientMessage);

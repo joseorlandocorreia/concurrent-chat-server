@@ -12,8 +12,6 @@ public class Server {
     private int portNumber = 6666;
     private ServerSocket serverSocket;
     private Map<String, ServerWorker> workersList;
-    private final String NICKNAME_TAKEN = "This alias is already taken, choose a different one\n";
-    private final String NICKNAME_VALID = "Nickname valid, welcome to the server\n";
 
     private ExecutorService workerThreads = Executors.newFixedThreadPool(100);
 
@@ -47,22 +45,20 @@ public class Server {
                 ServerWorker serverWorker = new ServerWorker(workerSocket);
 
                 String clientNickName = in.readLine();
-                System.out.println("clt nick " + clientNickName);
+                System.out.println(StringUtils.CLIENT_NICKNAME_STR + clientNickName);
 
-                workersList.put(clientNickName, serverWorker);
-
-                while (workersList.keySet().contains(clientNickName)) {
-                    out.write(NICKNAME_TAKEN);
+                while (workersList.containsKey(clientNickName)) {
+                    out.write(StringUtils.NICKNAME_TAKEN);
                     out.newLine();
                     out.flush();
                     clientNickName = in.readLine();
-                    System.out.println("nickname + " + clientNickName);
+                    System.out.println(StringUtils.CLIENT_NICKNAME_STR + clientNickName);
                     workersList.put(clientNickName, serverWorker);
                 }
 
-                System.out.println("New client connected from: " + serverSocket + " nickname: " + clientNickName);
+                System.out.println(StringUtils.NEW_CONNECTION + serverSocket + StringUtils.CLIENT_NICKNAME_STR + clientNickName);
 
-                out.write(NICKNAME_VALID);
+                out.write(StringUtils.NICKNAME_VALID);
                 out.newLine();
                 out.flush();
 
@@ -102,7 +98,7 @@ public class Server {
 
         public ServerWorker(Socket workerSocket) {
             this.workerSocket = workerSocket;
-            //openStreams();
+            openStreams();
         }
 
         @Override
@@ -110,7 +106,7 @@ public class Server {
 
             String receivedMessage;
 
-            while (!workerSocket.isClosed()) {
+            while (workerSocket.isConnected()) {
                 try {
                     receivedMessage = workerIn.readLine();
 
@@ -123,11 +119,11 @@ public class Server {
                         continue;
                     }
 
-                    System.out.println("Message from " + workerSocket + " Message: " + receivedMessage);
-                    broadcast("Message from " + workerSocket + " Message: " + receivedMessage);
+                    System.out.println(StringUtils.MESSAGE_FROM + workerSocket + StringUtils.MESSAGE_CONTENTS + receivedMessage);
+                    broadcast(StringUtils.MESSAGE_FROM + workerSocket + StringUtils.MESSAGE_FROM + receivedMessage);
 
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    closeStreams();
                 }
             }
         }
@@ -139,12 +135,13 @@ public class Server {
 
             switch (command) {
                 case "/quit":
-                    System.out.println("Closing connection from: " + workerSocket);
+                    System.out.println(StringUtils.CLOSING_CONNECTION + workerSocket);
                     closeStreams();
                     workersList.remove(this);
                     break;
                 case "/alias":
-                    System.out.println("Change alias command");
+                    System.out.println(StringUtils.CHANGE_ALIAS_MSG);
+                    //todo, implement this functionality
 
             }
 
@@ -177,7 +174,6 @@ public class Server {
                 workerOut.flush();
             } catch (IOException e) {
                 workersList.remove(this);
-                //e.printStackTrace();
             }
 
         }
